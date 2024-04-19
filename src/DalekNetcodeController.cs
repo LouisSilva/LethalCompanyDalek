@@ -14,10 +14,24 @@ public class DalekNetcodeController : NetworkBehaviour
     public event Action<string, int> OnDoAnimation;
     public event Action<string, ulong> OnChangeTargetPlayer;
     public event Action<string> OnIncreaseTargetPlayerFearLevel;
+    public event Action<string> OnShootGun;
+    public event Action<string> OnEnterDeathState;
 
     private void Start()
     {
         _mls = Logger.CreateLogSource($"{DalekPlugin.ModGuid}|Dalek Netcode Controller");
+    }
+    
+    [ClientRpc]
+    public void EnterDeathStateClientRpc(string receivedDalekId)
+    {
+        OnEnterDeathState?.Invoke(receivedDalekId);
+    }
+    
+    [ClientRpc]
+    public void ShootGunClientRpc(string receivedDalekId)
+    {
+        OnShootGun?.Invoke(receivedDalekId);
     }
     
     [ClientRpc]
