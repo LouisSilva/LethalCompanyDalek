@@ -64,7 +64,7 @@ public class DalekPlugin : BaseUnityPlugin
 
     private void SetupDalekEnemy()
     {
-        _dalekEnemyType = Assets.MainAssetBundle.LoadAsset<EnemyType>("Dalek");
+        _dalekEnemyType = Assets.MainAssetBundle.LoadAsset<EnemyType>("DalekEnemyType");
         
         TerminalNode dalekTerminalNode = Assets.MainAssetBundle.LoadAsset<TerminalNode>("DalekTN");
         TerminalKeyword dalekTerminalKeyword = Assets.MainAssetBundle.LoadAsset<TerminalKeyword>("DalekTK");
