@@ -37,6 +37,7 @@ public class DalekPlugin : BaseUnityPlugin
     private static DalekPlugin _instance;
 
     private static EnemyType _dalekEnemyType;
+    public static Item dalekLazerGun;
     
     public static DalekConfig DalekConfig { get; internal set; }
         
@@ -55,7 +56,9 @@ public class DalekPlugin : BaseUnityPlugin
             
         _harmony.PatchAll();
         DalekConfig = new DalekConfig(Config);
+        
         SetupDalekEnemy();
+        SetupDalekLazerItem();
         
         _harmony.PatchAll();
         _harmony.PatchAll(typeof(DalekPlugin));
@@ -73,12 +76,26 @@ public class DalekPlugin : BaseUnityPlugin
         Utilities.FixMixerGroups(_dalekEnemyType.enemyPrefab);
         RegisterEnemy(
             _dalekEnemyType,
-            999,
+            5,
             LevelTypes.All,
             SpawnType.Default,
             dalekTerminalNode,
             dalekTerminalKeyword
             );
+    }
+    
+    private static void SetupDalekLazerItem()
+    {
+        dalekLazerGun = Assets.MainAssetBundle.LoadAsset<Item>("DalekLazerItemData");
+        if (dalekLazerGun == null)
+        {
+            _mls.LogError("Failed to load DalekLazerItemData from AssetBundle");
+            return;
+        }
+            
+        NetworkPrefabs.RegisterNetworkPrefab(dalekLazerGun.spawnPrefab);
+        Utilities.FixMixerGroups(dalekLazerGun.spawnPrefab);
+        Items.RegisterScrap(dalekLazerGun, 0, LevelTypes.All);
     }
         
     private static void InitializeNetworkStuff()

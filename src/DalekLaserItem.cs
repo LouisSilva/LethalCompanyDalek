@@ -1,8 +1,10 @@
 ﻿using System;
 using BepInEx.Logging;
+using GameNetcodeStuff;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using Logger = BepInEx.Logging.Logger;
 
 namespace LethalCompanyDalek;
@@ -31,18 +33,20 @@ public class DalekLaserItem : PhysicsProp
     private ManualLogSource _mls;
     private string _laserId;
     
-    [SerializeField] private GameObject laserPrefab;
+    [SerializeField] private GameObject laserBeamPrefab;
+    
+    [HideInInspector] public bool isTriggerHeld;
+    
+    [SerializeField] private ItemOffset playerLaserItemOffset;
+    [SerializeField] private ItemOffset enemyLaserItemOffset;
+    
     private GameObject _currentLaser;
     private LaserBeamBehaviour _currentLaserBeam;
-    public bool isTriggerHeld = false;
-    
-    [SerializeField] private ItemOffset playerLaserOffset;
-    [SerializeField] private ItemOffset enemyLaserOffset;
 
     private void Awake()
     {
-        playerLaserOffset = new ItemOffset();
-        enemyLaserOffset = new ItemOffset();
+        playerLaserItemOffset = new ItemOffset();
+        enemyLaserItemOffset = new ItemOffset();
     }
 
     public override void Start()
@@ -56,16 +60,18 @@ public class DalekLaserItem : PhysicsProp
     public override void Update()
     {
         base.Update();
-        if (OwnerClientId != GameNetworkManager.Instance.localPlayerController.playerClientId) return;
+        if (!IsOwner) return;
         
-        isTriggerHeld = Keyboard.current.spaceKey.isPressed;
-        if (isTriggerHeld)
+        if (isBeingUsed)
         {
-            _currentLaser = Instantiate(laserPrefab, transform.position, Quaternion.identity);
+            _currentLaser = Instantiate(laserBeamPrefab, transform.position, Quaternion.identity);
             _currentLaser.transform.localRotation = transform.rotation * Quaternion.Euler(-90, 0, 0);
             _currentLaserBeam = _currentLaser.GetComponent<LaserBeamBehaviour>();
-            _currentLaserBeam.StartFiring(this, transform);
+            
+            if (isHeld && !isHeldByEnemy) _currentLaserBeam.StartFiring(this, transform, playerHeldBy);
+            else _currentLaserBeam.StartFiring(this, transform);
         }
+        
         else
         {
             if (_currentLaserBeam == null) return;
@@ -73,6 +79,12 @@ public class DalekLaserItem : PhysicsProp
             _currentLaser = null;
             _currentLaserBeam = null;
         }
+    }
+
+    public override void ItemActivate(bool used, bool buttonDown = true)
+    {
+        base.ItemActivate(used, buttonDown);
+        isBeingUsed = buttonDown;
     }
     
     public override void LateUpdate()
@@ -84,13 +96,13 @@ public class DalekLaserItem : PhysicsProp
             
             if (isHeldByEnemy)
             {
-                rotationOffset = enemyLaserOffset.rotationOffset;
-                positionOffset = enemyLaserOffset.positionOffset;
+                rotationOffset = enemyLaserItemOffset.rotationOffset;
+                positionOffset = enemyLaserItemOffset.positionOffset;
             }
             else
             {
-                rotationOffset = playerLaserOffset.rotationOffset;
-                positionOffset = playerLaserOffset.positionOffset;
+                rotationOffset = playerLaserItemOffset.rotationOffset;
+                positionOffset = playerLaserItemOffset.positionOffset;
             }
             
             transform.rotation = parentObject.rotation;
