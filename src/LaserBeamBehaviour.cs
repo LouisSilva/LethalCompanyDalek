@@ -5,7 +5,7 @@ namespace LethalCompanyDalek;
 
 public class LaserBeamBehaviour : MonoBehaviour
 {
-    [SerializeField] private float speed = 200f; // Speed of the laser
+    [SerializeField] private float speed = 50f; // Speed of the laser
     [SerializeField] private float maxStretch = 300f; // Maximum length of the laser beam
     [SerializeField] private float maxAirTime = 10f;
 
@@ -42,6 +42,7 @@ public class LaserBeamBehaviour : MonoBehaviour
     {
         if (!_gunFiredFrom.isTriggerHeld || _gunTransformPosition != _gunFiredFrom.transform.position || _gunTransformRotation != _gunFiredFrom.transform.rotation)
         {
+            Debug.Log("TRIGGER IS NOT HELD");
             triggerHeld = false;
         }
 
@@ -64,7 +65,7 @@ public class LaserBeamBehaviour : MonoBehaviour
 
                 _timeAlive = 0;
             }
-
+            
             backSemicircleRenderer.enabled = false;
         }
         else backSemicircleRenderer.enabled = true;
@@ -87,15 +88,15 @@ public class LaserBeamBehaviour : MonoBehaviour
         }
         else
         {
+            Debug.Log("Gun transform is null my g");
             _gunTransformForward = default;
             _gunTransformPosition = default;
             _gunTransformRotation = default;
         }
             
-            
         triggerHeld = true;
         _currentLength = 0;
-        transform.localScale = new Vector3(transform.localScale.x, 3f, transform.localScale.z);
+        transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y, transform.localScale.z);
         _playerShotFrom = playerShotFrom;
     }
 

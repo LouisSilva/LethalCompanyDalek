@@ -1,10 +1,7 @@
 ﻿using System;
 using BepInEx.Logging;
-using GameNetcodeStuff;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.Serialization;
 using Logger = BepInEx.Logging.Logger;
 
 namespace LethalCompanyDalek;
@@ -34,6 +31,8 @@ public class DalekLaserItem : PhysicsProp
     private string _laserId;
     
     [SerializeField] private GameObject laserBeamPrefab;
+
+    [SerializeField] private Transform lazerShootPoint;
     
     [HideInInspector] public bool isTriggerHeld;
     
@@ -64,12 +63,12 @@ public class DalekLaserItem : PhysicsProp
         
         if (isBeingUsed)
         {
-            _currentLaser = Instantiate(laserBeamPrefab, transform.position, Quaternion.identity);
-            _currentLaser.transform.localRotation = transform.rotation * Quaternion.Euler(-90, 0, 0);
+            _currentLaser = Instantiate(laserBeamPrefab, lazerShootPoint.position, Quaternion.identity);
+            _currentLaser.transform.localRotation = lazerShootPoint.rotation * Quaternion.Euler(-90, 0, 0);
             _currentLaserBeam = _currentLaser.GetComponent<LaserBeamBehaviour>();
             
-            if (isHeld && !isHeldByEnemy) _currentLaserBeam.StartFiring(this, transform, playerHeldBy);
-            else _currentLaserBeam.StartFiring(this, transform);
+            if (isHeld && !isHeldByEnemy) _currentLaserBeam.StartFiring(this, lazerShootPoint, playerHeldBy);
+            else _currentLaserBeam.StartFiring(this, lazerShootPoint);
         }
         
         else

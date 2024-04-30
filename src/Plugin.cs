@@ -58,7 +58,7 @@ public class DalekPlugin : BaseUnityPlugin
         DalekConfig = new DalekConfig(Config);
         
         SetupDalekEnemy();
-        SetupDalekLazerItem();
+        SetupDalekLazerGun();
         
         _harmony.PatchAll();
         _harmony.PatchAll(typeof(DalekPlugin));
@@ -84,7 +84,7 @@ public class DalekPlugin : BaseUnityPlugin
             );
     }
     
-    private static void SetupDalekLazerItem()
+    private static void SetupDalekLazerGun()
     {
         dalekLazerGun = Assets.MainAssetBundle.LoadAsset<Item>("DalekLazerItemData");
         if (dalekLazerGun == null)
