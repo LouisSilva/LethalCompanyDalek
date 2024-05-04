@@ -34,8 +34,6 @@ public class DalekLaserItem : PhysicsProp
 
     [SerializeField] private Transform lazerShootPoint;
     
-    [HideInInspector] public bool isTriggerHeld;
-    
     [SerializeField] private ItemOffset playerLaserItemOffset;
     [SerializeField] private ItemOffset enemyLaserItemOffset;
     

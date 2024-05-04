@@ -25,15 +25,11 @@ public class LaserBeamBehaviour : MonoBehaviour
 #pragma warning restore 0649
 
     private float _timeAlive;
-    private float _currentLength; 
     private float _hitCooldown;
     
-    public bool triggerHeld;
+    private Vector3 _gunTransformForward;
 
     private PlayerControllerB _playerShotFrom;
-    
-    private Vector3 _gunTransformForward;
-    private Vector3 _origionalSemicircleScale;
     
     private DalekLaserItem _gunFiredFrom;
 
@@ -43,49 +39,18 @@ public class LaserBeamBehaviour : MonoBehaviour
         _mls = Logger.CreateLogSource($"{DalekPlugin.ModGuid}|Lazer Beam {_lazerBeamId}");
     }
 
-    private void OnDestroy()
-    {
-        if (_playerShotFrom == null) return;
-        _playerShotFrom.playerActions.Movement.Look.performed -= HandleStopFiring;
-    }
-
     private void Start()
     {
-        _origionalSemicircleScale = frontSemicircleTransform.localScale;
         frontSemicircleRenderer.enabled = true;
+        backSemicircleRenderer.enabled = true;
 
-        speed = 300f;
+        speed = 25f;
         maxAirTime = 4f;
     }
 
     private void Update()
     {
         _hitCooldown -= Time.deltaTime;
-        
-        if (triggerHeld)
-        {
-            LogDebug("Trigger is held");
-            if (_currentLength < maxStretch)
-            {
-                // Increase the length of the laser if the trigger is held
-                float increment = speed * Time.deltaTime;
-                _currentLength += increment;
-                _currentLength = Mathf.Min(_currentLength, maxStretch);
-                transform.localScale = new Vector3(transform.localScale.x, _currentLength, transform.localScale.z);
-
-                // Fix the semicircle scales
-                frontSemicircleTransform.localScale = new Vector3(_origionalSemicircleScale.x,
-                    _origionalSemicircleScale.y / transform.localScale.y, _origionalSemicircleScale.z);
-
-                backSemicircleTransform.localScale = new Vector3(_origionalSemicircleScale.x,
-                    _origionalSemicircleScale.y / transform.localScale.y, _origionalSemicircleScale.z);
-
-                _timeAlive = 0;
-            }
-            
-            backSemicircleRenderer.enabled = false;
-        }
-        else backSemicircleRenderer.enabled = true;
         
         // move the laser forward
         transform.position += _gunTransformForward * (speed * Time.deltaTime);
@@ -103,24 +68,17 @@ public class LaserBeamBehaviour : MonoBehaviour
         }
         else
         {
-            LogDebug("Gun transform is null my g");
+            LogDebug("Gun transform is null");
             _gunTransformForward = default;
         }
-            
-        triggerHeld = true;
-        _currentLength = 0;
-        transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y, transform.localScale.z);
-        
-        // Subscribe to the event when the player moves their mouse
-        if (playerShotFrom == null) return;
+
         _playerShotFrom = playerShotFrom;
-        _playerShotFrom.playerActions.Movement.Look.performed += HandleStopFiring;
+        transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y, transform.localScale.z);
     }
 
     public void StopFiring()
     {
-        triggerHeld = false;
-        LogDebug("Stop firing called");
+        
     }
 
     private void HandleStopFiring(InputAction.CallbackContext context)
@@ -132,7 +90,7 @@ public class LaserBeamBehaviour : MonoBehaviour
     {
         if (_hitCooldown > 0) return;
         if (!other.TryGetComponent(out IHittable hittable)) return;
-        hittable.Hit(9999, Vector3.zero, _playerShotFrom, false, 731);
+        hittable.Hit(100, Vector3.zero, _playerShotFrom, false, 731);
         _hitCooldown = 0.25f;
     }
 
