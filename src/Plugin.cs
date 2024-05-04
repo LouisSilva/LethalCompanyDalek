@@ -60,7 +60,6 @@ public class DalekPlugin : BaseUnityPlugin
         SetupDalekEnemy();
         SetupDalekLazerGun();
         
-        _harmony.PatchAll();
         _harmony.PatchAll(typeof(DalekPlugin));
         _mls.LogInfo($"Plugin {ModName} is loaded!");
     }

@@ -66,9 +66,17 @@ public class DalekLaserItem : PhysicsProp
             _currentLaser = Instantiate(laserBeamPrefab, lazerShootPoint.position, Quaternion.identity);
             _currentLaser.transform.localRotation = lazerShootPoint.rotation * Quaternion.Euler(-90, 0, 0);
             _currentLaserBeam = _currentLaser.GetComponent<LaserBeamBehaviour>();
-            
-            if (isHeld && !isHeldByEnemy) _currentLaserBeam.StartFiring(this, lazerShootPoint, playerHeldBy);
-            else _currentLaserBeam.StartFiring(this, lazerShootPoint);
+
+            if (isHeld && playerHeldBy != null)
+            {
+                LogDebug("Player held by is not null");
+                _currentLaserBeam.StartFiring(this, lazerShootPoint, playerHeldBy);
+            }
+            else
+            {
+                LogDebug("Player held by is null");
+                _currentLaserBeam.StartFiring(this, lazerShootPoint);
+            }
         }
         
         else

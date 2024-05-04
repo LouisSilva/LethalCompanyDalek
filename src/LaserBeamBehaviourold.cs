@@ -1,20 +1,14 @@
 ﻿using System;
-using BepInEx.Logging;
 using GameNetcodeStuff;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using Logger = BepInEx.Logging.Logger;
 
 namespace LethalCompanyDalek;
 
-public class LaserBeamBehaviour : MonoBehaviour
+public class LaserBeamBehaviou : MonoBehaviour
 {
-    private string _lazerBeamId;
-    private ManualLogSource _mls;
-    
-    [SerializeField] private float speed = 300f; // Speed of the laser
+    [SerializeField] private float speed = 50f; // Speed of the laser
     [SerializeField] private float maxStretch = 300f; // Maximum length of the laser beam
-    [SerializeField] private float maxAirTime = 4f;
+    [SerializeField] private float maxAirTime = 10f;
 
 #pragma warning disable 0649
     [SerializeField] private Renderer frontSemicircleRenderer;
@@ -25,46 +19,59 @@ public class LaserBeamBehaviour : MonoBehaviour
 #pragma warning restore 0649
 
     private float _timeAlive;
-    private float _currentLength; 
-    private float _hitCooldown;
+    private float _currentLength; // Current length of the laser
+    private float _oldPlayerCameraUp;
+    private float _oldPlayerYRotation;
     
-    public bool triggerHeld;
+    public bool triggerHeld; // Whether the trigger is still held
 
     private PlayerControllerB _playerShotFrom;
     
     private Vector3 _gunTransformForward;
     private Vector3 _origionalSemicircleScale;
+
+    private FiringMode _currentFiringMode;
     
     private DalekLaserItem _gunFiredFrom;
 
-    private void Awake()
+    private enum FiringMode
     {
-        _lazerBeamId = Guid.NewGuid().ToString();
-        _mls = Logger.CreateLogSource($"{DalekPlugin.ModGuid}|Lazer Beam {_lazerBeamId}");
-    }
-
-    private void OnDestroy()
-    {
-        if (_playerShotFrom == null) return;
-        _playerShotFrom.playerActions.Movement.Look.performed -= HandleStopFiring;
+        Dalek,
+        Player,
     }
 
     private void Start()
     {
         _origionalSemicircleScale = frontSemicircleTransform.localScale;
         frontSemicircleRenderer.enabled = true;
-
-        speed = 300f;
-        maxAirTime = 4f;
     }
 
     private void Update()
     {
-        _hitCooldown -= Time.deltaTime;
-        
+        switch (_currentFiringMode)
+        {
+            case FiringMode.Player:
+            {
+                if (!_gunFiredFrom.isTriggerHeld || CheckIfCurrentPlayerViewHasChanged())
+                {
+                    Debug.Log("TRIGGER IS NOT HELD");
+                    triggerHeld = false;
+                }
+                
+                _oldPlayerCameraUp = _playerShotFrom.cameraUp;
+                _oldPlayerYRotation = _playerShotFrom.thisPlayerBody.eulerAngles.y;
+                break;
+            }
+            
+            case FiringMode.Dalek:
+                break;
+            
+            default:
+                return;
+        }
+
         if (triggerHeld)
         {
-            LogDebug("Trigger is held");
             if (_currentLength < maxStretch)
             {
                 // Increase the length of the laser if the trigger is held
@@ -94,7 +101,7 @@ public class LaserBeamBehaviour : MonoBehaviour
         if (_timeAlive > maxAirTime) Destroy(gameObject);
     }
 
-    public void StartFiring(DalekLaserItem gunFiredFromLocal, Transform gunTransform = default, PlayerControllerB playerShotFrom = null)
+    public void StartFiring(DalekLaserItem gunFiredFromLocal, PlayerControllerB playerShotFrom, Transform gunTransform = default)
     {
         _gunFiredFrom = gunFiredFromLocal;
         if (gunTransform != null)
@@ -103,43 +110,59 @@ public class LaserBeamBehaviour : MonoBehaviour
         }
         else
         {
-            LogDebug("Gun transform is null my g");
-            _gunTransformForward = default;
+            Debug.Log("Gun transform is null my g, bad stuff");
+            return;
         }
-            
+        
         triggerHeld = true;
         _currentLength = 0;
         transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y, transform.localScale.z);
-        
-        // Subscribe to the event when the player moves their mouse
-        if (playerShotFrom == null) return;
         _playerShotFrom = playerShotFrom;
-        _playerShotFrom.playerActions.Movement.Look.performed += HandleStopFiring;
+        _oldPlayerCameraUp = _playerShotFrom.cameraUp;
+        _oldPlayerYRotation = _playerShotFrom.thisPlayerBody.eulerAngles.y;
+        _currentFiringMode = FiringMode.Player;
+    }
+    
+    public void StartFiring(DalekLaserItem gunFiredFromLocal, Transform gunTransform = default)
+    {
+        _gunFiredFrom = gunFiredFromLocal;
+        if (gunTransform != null)
+        {
+            _gunTransformForward = gunTransform.forward;
+        }
+        else
+        {
+            Debug.Log("Gun transform is null my g, bad stuff");
+            return;
+        }
+        
+        triggerHeld = true;
+        _currentLength = 0;
+        transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y, transform.localScale.z);
+        _playerShotFrom = null;
+        _currentFiringMode = FiringMode.Dalek;
     }
 
     public void StopFiring()
     {
         triggerHeld = false;
-        LogDebug("Stop firing called");
     }
 
-    private void HandleStopFiring(InputAction.CallbackContext context)
+    private bool CheckIfCurrentPlayerViewHasChanged()
     {
-        StopFiring();
+        // Access rotation values from the player controller
+        float currentCameraUp = _playerShotFrom.cameraUp;
+        float currentYRot = _playerShotFrom.thisPlayerBody.eulerAngles.y;
+
+        // Check if the view has significantly changed
+        return Mathf.Abs(_oldPlayerCameraUp - currentCameraUp) > 1.0f || Mathf.Abs(_oldPlayerYRotation - currentYRot) > 1.0f;
     }
 
     private void OnTriggerStay(Collider other)
     {
-        if (_hitCooldown > 0) return;
-        if (!other.TryGetComponent(out IHittable hittable)) return;
-        hittable.Hit(9999, Vector3.zero, _playerShotFrom, false, 731);
-        _hitCooldown = 0.25f;
-    }
-
-    private void LogDebug(string msg)
-    {
-        #if DEBUG
-        _mls.LogInfo($"{msg}");
-        #endif
+        if (other.TryGetComponent(out IHittable hittable))
+        {
+            hittable.Hit(9999, Vector3.zero, _playerShotFrom, false, 731);
+        }
     }
 }
