@@ -7,31 +7,26 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace LethalCompanyDalek;
 
-public class LaserBeamBehaviour : MonoBehaviour
+public class LazerBeamBehaviour : MonoBehaviour
 {
     private string _lazerBeamId;
     private ManualLogSource _mls;
     
     [SerializeField] private float speed = 300f; // Speed of the laser
-    [SerializeField] private float maxStretch = 300f; // Maximum length of the laser beam
     [SerializeField] private float maxAirTime = 4f;
 
 #pragma warning disable 0649
     [SerializeField] private Renderer frontSemicircleRenderer;
     [SerializeField] private Renderer backSemicircleRenderer;
-
-    [SerializeField] private Transform frontSemicircleTransform;
-    [SerializeField] private Transform backSemicircleTransform;
 #pragma warning restore 0649
-
-    private float _timeAlive;
+    
     private float _hitCooldown;
     
     private Vector3 _gunTransformForward;
 
     private PlayerControllerB _playerShotFrom;
     
-    private DalekLaserItem _gunFiredFrom;
+    private DalekLazerItem _gunFiredFrom;
 
     private void Awake()
     {
@@ -48,42 +43,42 @@ public class LaserBeamBehaviour : MonoBehaviour
         maxAirTime = 4f;
     }
 
+    private void OnEnable()
+    {
+        // Deactivate game object after the max allowed air time
+        Invoke(nameof(Deactivate), maxAirTime);
+    }
+
+    private void OnDisable()
+    {
+        CancelInvoke(nameof(Deactivate));
+    }
+
     private void Update()
     {
         _hitCooldown -= Time.deltaTime;
         
         // move the laser forward
         transform.position += _gunTransformForward * (speed * Time.deltaTime);
-
-        _timeAlive += Time.deltaTime;
-        if (_timeAlive > maxAirTime) Destroy(gameObject);
     }
 
-    public void StartFiring(DalekLaserItem gunFiredFromLocal, Transform gunTransform = default, PlayerControllerB playerShotFrom = null)
+    public void StartFiring(DalekLazerItem gunFiredFromLocal, Transform gunTransform = default, PlayerControllerB playerShotFrom = null)
     {
         _gunFiredFrom = gunFiredFromLocal;
-        if (gunTransform != null)
-        {
-            _gunTransformForward = gunTransform.forward;
-        }
-        else
-        {
-            LogDebug("Gun transform is null");
-            _gunTransformForward = default;
-        }
-
+        _gunTransformForward = gunTransform != null ? gunTransform.forward : default;
         _playerShotFrom = playerShotFrom;
         transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y, transform.localScale.z);
     }
 
-    public void StopFiring()
+    private void Deactivate()
     {
+        gameObject.SetActive(false);
         
-    }
-
-    private void HandleStopFiring(InputAction.CallbackContext context)
-    {
-        StopFiring();
+        // Reset other variables because the game objects are recycled
+        _hitCooldown = 0;
+        _gunTransformForward = default;
+        _playerShotFrom = null;
+        _gunFiredFrom = null;
     }
 
     private void OnTriggerStay(Collider other)

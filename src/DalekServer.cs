@@ -56,8 +56,12 @@ public class DalekServer : EnemyAI
         netcodeController = GetComponent<DalekNetcodeController>();
         if (netcodeController == null) _mls.LogError("Netcode Controller is null");
         
-        netcodeController.UpdateDalekIdClientRpc(_dalekId);
+        netcodeController.SyncDalekIdClientRpc(_dalekId);
         UnityEngine.Random.InitState(StartOfRound.Instance.randomMapSeed + _dalekId.GetHashCode());
+        InitializeConfigValues();
+
+        netcodeController.SpawnDalekLazerGunServerRpc(_dalekId);
+        netcodeController.GrabDalekLazerGunClientRpc(_dalekId);
         
         LogDebug("Dalek Spawned!");
     }
@@ -359,6 +363,11 @@ public class DalekServer : EnemyAI
         if (!IsServer) return;
         if (searchForPlayers.inProgress)
             searchForPlayers.searchWidth = Mathf.Clamp(searchForPlayers.searchWidth + 10f, 1f, maxSearchRadius);
+    }
+
+    private void InitializeConfigValues()
+    {
+        
     }
     
     private void CalculateAgentSpeed()

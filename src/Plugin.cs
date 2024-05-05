@@ -240,18 +240,6 @@ public class SyncedInstance<T>
             return default;
         }
     }
-        
-    // Got this from the giant specimens mod
-    protected void ClearUnusedEntries(ConfigFile configFile) {
-        PropertyInfo orphanedEntriesProp = configFile.GetType().GetProperty("OrphanedEntries", BindingFlags.NonPublic | BindingFlags.Instance);
-        if (orphanedEntriesProp != null)
-        {
-            Dictionary<ConfigDefinition, string> orphanedEntries = (Dictionary<ConfigDefinition, string>)orphanedEntriesProp.GetValue(configFile, null);
-            orphanedEntries.Clear(); // Clear orphaned entries (Unbounded/Abandoned entries)
-        }
-
-        configFile.Save();
-    }
 }
 
 internal static class Assets
