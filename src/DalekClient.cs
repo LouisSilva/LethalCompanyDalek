@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using BepInEx.Logging;
 using GameNetcodeStuff;
 using Unity.Netcode;
@@ -13,6 +14,16 @@ public class DalekClient : MonoBehaviour
     private string _dalekId;
     
 #pragma warning disable 0649
+    [Header("Audio")] [Space(5f)] 
+    [SerializeField] private AudioSource dalekVoiceSource;
+    [SerializeField] private AudioSource dalekSfxSource;
+    
+    public AudioClip[] sawPlayerAudio;
+    public AudioClip[] roamingAudio;
+    public AudioClip[] killedPlayerAudio;
+    public AudioClip[] exterminateAudio;
+    public AudioClip[] disabledShipAudio;
+    
     [Header("Controllers")] [Space(5f)] 
     [SerializeField] private Transform dalekLazerGunBone;
     [SerializeField] private Animator animator;
@@ -35,6 +46,8 @@ public class DalekClient : MonoBehaviour
         netcodeController.OnSpawnDalekLazerGun += HandleSpawnDalekLazerGun;
         netcodeController.OnGrabDalekLazerGun += HandleGrabDalekLazerGun;
         netcodeController.OnShootGun += HandleShootDalekLazerGun;
+        netcodeController.OnEnterDeathState += HandleEnterDeathState;
+        netcodeController.OnPlayAudioClipType += HandlePlayAudioClipType;
     }
 
     private void OnDisable()
@@ -45,6 +58,8 @@ public class DalekClient : MonoBehaviour
         netcodeController.OnSpawnDalekLazerGun -= HandleSpawnDalekLazerGun;
         netcodeController.OnGrabDalekLazerGun -= HandleGrabDalekLazerGun;
         netcodeController.OnShootGun -= HandleShootDalekLazerGun;
+        netcodeController.OnEnterDeathState -= HandleEnterDeathState;
+        netcodeController.OnPlayAudioClipType -= HandlePlayAudioClipType;
     }
 
     private void Awake()
@@ -55,6 +70,14 @@ public class DalekClient : MonoBehaviour
     private void HandleShootDalekLazerGun(string receivedDalekId)
     {
         if (_dalekId != receivedDalekId) return;
+        StartCoroutine(ShootLazerGun());
+    }
+
+    private IEnumerator ShootLazerGun()
+    {
+        _heldDalekLazerGun.isBeingUsed = true;
+        yield return new WaitForSeconds(0.75f);
+        _heldDalekLazerGun.isBeingUsed = false;
     }
 
     private void HandleSpawnDalekLazerGun(string receivedDalekId, NetworkObjectReference dalekLazerGunObjectReference,
@@ -77,6 +100,36 @@ public class DalekClient : MonoBehaviour
         _heldDalekLazerGun.isHeldByEnemy = true;
         _heldDalekLazerGun.grabbableToEnemies = false;
         _heldDalekLazerGun.grabbable = false;
+    }
+
+    private void HandlePlayAudioClipType(
+        string receivedDalekId, 
+        DalekNetcodeController.AudioClipTypes audioClipType, 
+        int clipIndex, 
+        bool interrupt = true)
+    {
+        if (_dalekId != receivedDalekId) return;
+
+        AudioClip audioClipToPlay = audioClipType switch
+        {
+            DalekNetcodeController.AudioClipTypes.SawPlayer => sawPlayerAudio[clipIndex],
+            DalekNetcodeController.AudioClipTypes.Roaming => roamingAudio[clipIndex],
+            DalekNetcodeController.AudioClipTypes.KilledPlayer => killedPlayerAudio[clipIndex],
+            DalekNetcodeController.AudioClipTypes.Exterminate => exterminateAudio[clipIndex],
+            DalekNetcodeController.AudioClipTypes.DisabledShip => disabledShipAudio[clipIndex],
+            _ => null
+        };
+
+        if (audioClipToPlay == null)
+        {
+            _mls.LogError($"Invalid audio clip with type: {audioClipType} and index: {clipIndex}");
+            return;
+        }
+        
+        LogDebug($"Playing audio clip: {audioClipToPlay.name}");
+        if (interrupt) dalekVoiceSource.Stop(true);
+        dalekVoiceSource.PlayOneShot(audioClipToPlay);
+        WalkieTalkie.TransmitOneShotAudio(dalekVoiceSource, audioClipToPlay, dalekVoiceSource.volume);
     }
     
     
@@ -105,7 +158,14 @@ public class DalekClient : MonoBehaviour
     private void HandleEnterDeathState(string receivedDalekId)
     {
         if (_dalekId != receivedDalekId) return;
+
+        if (_heldDalekLazerGun != null)
+        {
+            _heldDalekLazerGun.grabbableToEnemies = false;
+            _heldDalekLazerGun.grabbable = true;
+        }
         
+        Destroy(this);
     }
     
     /// <summary>

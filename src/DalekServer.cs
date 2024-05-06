@@ -27,6 +27,7 @@ public class DalekServer : EnemyAI
     private float _agentMaxSpeed;
     private float _takeDamageCooldown;
     private float _shootTimer;
+    private float _audioLineTimer;
     
     private Vector3 _targetPosition;
     
@@ -40,7 +41,7 @@ public class DalekServer : EnemyAI
     {
         Searching,
         InvestigatingTargetPosition,
-        ShootingAndChasing,
+        Shooting,
         Detain,
         Dead
     }
@@ -73,6 +74,7 @@ public class DalekServer : EnemyAI
 
         _shootTimer -= Time.deltaTime;
         _takeDamageCooldown -= Time.deltaTime;
+        _audioLineTimer -= Time.deltaTime;
 
         switch (currentBehaviourStateIndex)
         {
@@ -81,19 +83,13 @@ public class DalekServer : EnemyAI
                 break;
             }
 
-            case (int)States.ShootingAndChasing:
+            case (int)States.InvestigatingTargetPosition:
             {
-                // Check the distance between the dalek and the target player, if they are close, then stop moving
-                if (Vector3.Distance(transform.position, targetPlayer.transform.position) <= 4f)
-                {
-                    agentMaxSpeed = 0f;
-                    agent.speed = 0f;
-                }
-                else
-                {
-                    agentMaxSpeed = 1f;
-                }
-                
+                break;
+            }
+
+            case (int)States.Shooting:
+            {
                 break;
             }
         }
@@ -110,42 +106,31 @@ public class DalekServer : EnemyAI
         {
             case (int)States.Searching:
             {
-                PlayerControllerB tempTargetPlayer = CheckLineOfSightForClosestPlayer(viewWidth, viewRange, Mathf.Clamp(proximityAwareness, -1, int.MaxValue));
+                PlayerControllerB tempTargetPlayer = CheckLineOfSightForClosestPlayer(viewWidth, viewRange, proximityAwareness);
                 if (tempTargetPlayer != null)
                 {
-                    SwitchBehaviourStateLocally((int)States.ShootingAndChasing);
+                    ChangeTargetPlayer(tempTargetPlayer.actualClientId);
+                    SwitchBehaviourStateLocally((int)States.Shooting);
                     break;
                 }
 
-                if (!searchForPlayers.inProgress)
-                {
-                    if (_targetPosition != default)
-                    {
-                        if (CheckForPath(_targetPosition))
-                        {
-                            searchForPlayers.searchWidth = 30f;
-                            StartSearch(_targetPosition, searchForPlayers);
-                            break;
-                        }
-                    }
-                    
-                    // If there is no target player last seen position, just search from where the dalek is currently at
-                    searchForPlayers.searchWidth = 100f;
-                    StartSearch(transform.position, searchForPlayers);
-                }
+                // if (_audioLineTimer < 0)
+                // {
+                //     //netcodeController.PlayAudioClipTypeClientRpc(_dalekId, DalekNetcodeController.AudioClipTypes.Roaming);
+                // }
                 
                 break;
             }
 
             case (int)States.InvestigatingTargetPosition:
             {
-                if (searchForPlayers.inProgress) StopSearch(searchForPlayers);
-                
                 // Check for player in LOS
                 PlayerControllerB tempTargetPlayer = CheckLineOfSightForClosestPlayer(viewWidth, viewRange, proximityAwareness);
                 if (tempTargetPlayer != null)
                 {
-                    SwitchBehaviourStateLocally((int)States.ShootingAndChasing);
+                    targetPlayer = tempTargetPlayer;
+                    netcodeController.ChangeTargetPlayerClientRpc(_dalekId, tempTargetPlayer.actualClientId);
+                    SwitchBehaviourStateLocally((int)States.Shooting);
                     break;
                 }
                 
@@ -158,43 +143,36 @@ public class DalekServer : EnemyAI
                 break;
             }
 
-            case (int)States.ShootingAndChasing:
+            case (int)States.Shooting:
             {
-                if (searchForPlayers.inProgress) StopSearch(searchForPlayers);
-                
-                PlayerControllerB playerControllerB = CheckLineOfSightForClosestPlayer(135f, 40, 3);
+                PlayerControllerB playerControllerB = CheckLineOfSightForClosestPlayer(viewWidth, viewRange, proximityAwareness);
                 if (playerControllerB == null)
                 {
                     SwitchBehaviourStateLocally((int)States.InvestigatingTargetPosition);
                     break;
                 }
 
-                if (stunNormalizedTimer > 0) break;
-                BeginChasingPlayer(playerControllerB.playerClientId);
+                ChangeTargetPlayer(playerControllerB.playerClientId);
+                movingTowardsTargetPlayer = true;
                 
                 // _targetPosition is the last seen position of a player before they went out of view
                 _targetPosition = targetPlayer.transform.position;
                 netcodeController.IncreaseTargetPlayerFearLevelClientRpc(_dalekId);
                 
+                if (stunNormalizedTimer > 0) break;
                 AimAtPosition(targetPlayer.transform.position);
-                
-                if (playerControllerB != targetPlayer)
-                {
-                    netcodeController.ChangeTargetPlayerClientRpc(_dalekId, playerControllerB.playerClientId);
-                    targetPlayer = playerControllerB;
-                }
                 
                 // Check if the shoot timer is complete
                 if (_shootTimer > 0) break;
         
-                // Check if the enforcer ghost is aiming at the player
+                // Check if the dalek is aiming at the player
                 Vector3 directionToPlayer = targetPlayer.transform.position - gun.transform.position;
                 directionToPlayer.Normalize();
-                float dotProduct = Vector3.Dot(gun.transform.forward, directionToPlayer);
+                float dotProduct = Vector3.Dot(gun.transform.up, directionToPlayer);
                 float distanceToPlayer = Vector3.Distance(gun.transform.position, targetPlayer.transform.position);
         
                 float accuracyThreshold = 0.875f;
-                if (distanceToPlayer < 3f)
+                if (distanceToPlayer < 1f)
                     accuracyThreshold = 0.7f;
         
                 if (dotProduct > accuracyThreshold)
@@ -206,6 +184,7 @@ public class DalekServer : EnemyAI
                 
                 break;
             }
+            
         }
     }
     
@@ -214,6 +193,13 @@ public class DalekServer : EnemyAI
         Vector3 direction = (position - transform.position).normalized;
         Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
         transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+    }
+
+    private void ChangeTargetPlayer(ulong playerObjectId)
+    {
+        PlayerControllerB player = StartOfRound.Instance.allPlayerScripts[playerObjectId];
+        if (player != targetPlayer) netcodeController.ChangeTargetPlayerClientRpc(_dalekId, playerObjectId);
+        targetPlayer = player;
     }
 
     private void BeginChasingPlayer(ulong targetPlayerObjectId)
@@ -238,7 +224,7 @@ public class DalekServer : EnemyAI
         {
             if (playerWhoHit == null) return;
             netcodeController.ChangeTargetPlayerClientRpc(_dalekId, playerWhoHit.playerClientId);
-            SwitchBehaviourStateLocally((int)States.ShootingAndChasing);
+            SwitchBehaviourStateLocally((int)States.Shooting);
             BeginChasingPlayer(playerWhoHit.playerClientId);
         }
         else
@@ -264,7 +250,7 @@ public class DalekServer : EnemyAI
         if (setStunnedByPlayer != null)
         {
             netcodeController.ChangeTargetPlayerClientRpc(_dalekId, setStunnedByPlayer.playerClientId);
-            SwitchBehaviourStateLocally((int)States.ShootingAndChasing);
+            SwitchBehaviourStateLocally((int)States.Shooting);
             BeginChasingPlayer(setStunnedByPlayer.playerClientId);
         }
     }
@@ -285,6 +271,21 @@ public class DalekServer : EnemyAI
                 netcodeController.ChangeTargetPlayerClientRpc(_dalekId, 69420);
                 if (searchForPlayers.inProgress) StopSearch(searchForPlayers);
                 
+                if (_targetPosition != default)
+                {
+                    if (CheckForPath(_targetPosition))
+                    {
+                        searchForPlayers.searchWidth = 30f;
+                        StartSearch(_targetPosition, searchForPlayers);
+                    }
+                }
+                else
+                {
+                    // If there is no target player last seen position, just search from where the dalek is currently at
+                    searchForPlayers.searchWidth = 100f;
+                    StartSearch(transform.position, searchForPlayers);
+                }
+                
                 break;
             }
 
@@ -296,6 +297,7 @@ public class DalekServer : EnemyAI
                 openDoorSpeedMultiplier = 2;
                 
                 // Set investigating position
+                if (searchForPlayers.inProgress) StopSearch(searchForPlayers);
                 if (_targetPosition == default) SwitchBehaviourStateLocally((int)States.Searching);
                 else
                 {
@@ -308,7 +310,7 @@ public class DalekServer : EnemyAI
                 break;
             }
 
-            case (int)States.ShootingAndChasing:
+            case (int)States.Shooting:
             {
                 _agentMaxSpeed = 2f;
                 _agentMaxAcceleration = 25f;
@@ -369,7 +371,7 @@ public class DalekServer : EnemyAI
     {
         
     }
-    
+
     private void CalculateAgentSpeed()
     {
         if (!IsServer) return;
@@ -377,12 +379,17 @@ public class DalekServer : EnemyAI
         {
             agent.speed = 0;
             agent.acceleration = _agentMaxAcceleration;
-            return;
+            
+        }
+        else if (currentBehaviourStateIndex == (int)States.Shooting && Vector3.Distance(transform.position, targetPlayer.transform.position) <= 3 && CheckLineOfSightForPlayer(viewWidth, viewRange, proximityAwareness))
+        {
+            agent.speed = 0;
+            agent.acceleration = _agentMaxAcceleration;
         }
 
-        if (currentBehaviourStateIndex != (int)States.Dead)
+        else if (currentBehaviourStateIndex != (int)States.Dead)
         {
-            MoveWithAcceleration();
+                MoveWithAcceleration();
         }
     }
     

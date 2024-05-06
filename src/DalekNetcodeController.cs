@@ -9,6 +9,15 @@ namespace LethalCompanyDalek;
 public class DalekNetcodeController : NetworkBehaviour
 {
     private ManualLogSource _mls;
+
+    public enum AudioClipTypes
+    {
+        SawPlayer,
+        Roaming,
+        KilledPlayer,
+        Exterminate,
+        DisabledShip
+    }
     
     public event Action<string> OnSyncDalekId;
     public event Action<string> OnInitializeConfigValues;
@@ -19,10 +28,17 @@ public class DalekNetcodeController : NetworkBehaviour
     public event Action<string> OnEnterDeathState;
     public event Action<string, NetworkObjectReference, int> OnSpawnDalekLazerGun;
     public event Action<string> OnGrabDalekLazerGun;
+    public event Action<string, AudioClipTypes, int, bool> OnPlayAudioClipType;
 
     private void Start()
     {
         _mls = Logger.CreateLogSource($"{DalekPlugin.ModGuid}|Dalek Netcode Controller");
+    }
+
+    [ClientRpc]
+    public void PlayAudioClipTypeClientRpc(string receivedDalekId, AudioClipTypes audioClipType, int clipIndex, bool interrupt = true)
+    {
+        OnPlayAudioClipType?.Invoke(receivedDalekId, audioClipType, clipIndex, interrupt);
     }
 
     [ServerRpc]

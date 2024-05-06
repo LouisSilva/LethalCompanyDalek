@@ -49,7 +49,7 @@ public class DalekLazerItem : PhysicsProp
         _mls = Logger.CreateLogSource($"{DalekPlugin.ModGuid}|Dalek lazer {_lazerId}");
         
         playerlazerItemOffset = new ItemOffset();
-        enemylazerItemOffset = new ItemOffset();
+        enemylazerItemOffset = new ItemOffset(new Vector3(0, 0, -0.075f));
     }
 
     public override void Start()
@@ -76,6 +76,7 @@ public class DalekLazerItem : PhysicsProp
         // Get pooled lazer beam object
         GameObject currentlazerBeamObject = GetPooledLazerBeamObject();
         if (currentlazerBeamObject == null) return;
+        LogDebug("current lazer beam is not null");
 
         // Set the position and rotation
         currentlazerBeamObject.transform.position = lazerShootPoint.transform.position;

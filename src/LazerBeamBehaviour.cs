@@ -64,6 +64,7 @@ public class LazerBeamBehaviour : MonoBehaviour
 
     public void StartFiring(DalekLazerItem gunFiredFromLocal, Transform gunTransform = default, PlayerControllerB playerShotFrom = null)
     {
+        gameObject.SetActive(true);
         _gunFiredFrom = gunFiredFromLocal;
         _gunTransformForward = gunTransform != null ? gunTransform.forward : default;
         _playerShotFrom = playerShotFrom;
@@ -83,9 +84,12 @@ public class LazerBeamBehaviour : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
-        if (_hitCooldown > 0) return;
-        if (!other.TryGetComponent(out IHittable hittable)) return;
-        hittable.Hit(100, Vector3.zero, _playerShotFrom, false, 731);
+        if (_hitCooldown <= 0)
+        {
+            if (other.TryGetComponent(out EnemyAI enemyAI)) enemyAI.HitEnemy(100, _playerShotFrom, false, 731);
+            else if (other.TryGetComponent(out PlayerControllerB player)) player.DamagePlayer(100, false, true, CauseOfDeath.Gunshots);
+        }
+        
         _hitCooldown = 0.25f;
     }
 
