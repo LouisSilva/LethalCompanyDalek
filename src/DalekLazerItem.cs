@@ -76,7 +76,6 @@ public class DalekLazerItem : PhysicsProp
         // Get pooled lazer beam object
         GameObject currentlazerBeamObject = GetPooledLazerBeamObject();
         if (currentlazerBeamObject == null) return;
-        LogDebug("current lazer beam is not null");
 
         // Set the position and rotation
         currentlazerBeamObject.transform.position = lazerShootPoint.transform.position;

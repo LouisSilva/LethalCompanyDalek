@@ -3,6 +3,7 @@ using BepInEx.Logging;
 using Unity.Netcode;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
+using Random = UnityEngine.Random;
 
 namespace LethalCompanyDalek;
 
@@ -29,14 +30,51 @@ public class DalekNetcodeController : NetworkBehaviour
     public event Action<string, NetworkObjectReference, int> OnSpawnDalekLazerGun;
     public event Action<string> OnGrabDalekLazerGun;
     public event Action<string, AudioClipTypes, int, bool> OnPlayAudioClipType;
+    public event Action<string, bool> OnSetIsShooting;
 
     private void Start()
     {
         _mls = Logger.CreateLogSource($"{DalekPlugin.ModGuid}|Dalek Netcode Controller");
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    public void SetIsShootingServerRpc(string receivedDalekId, bool isShooting)
+    {
+        OnSetIsShooting?.Invoke(receivedDalekId, isShooting);
+    }
+
+    [ServerRpc]
+    public void PlayAudioClipTypeServerRpc(string receivedDalekId, AudioClipTypes audioClipType, bool interrupt = false)
+    {
+        DalekClient dalekClient = GetComponent<DalekClient>();
+        if (dalekClient == null)
+        {
+            _mls.LogError("Dalek client was null, cannot play audio clip");
+            return;
+        }
+        
+        int numberOfAudioClips = audioClipType switch
+        {
+            AudioClipTypes.SawPlayer => dalekClient.sawPlayerAudio.Length,
+            AudioClipTypes.Roaming => dalekClient.roamingAudio.Length,
+            AudioClipTypes.KilledPlayer => dalekClient.killedPlayerAudio.Length,
+            AudioClipTypes.Exterminate => dalekClient.exterminateAudio.Length,
+            AudioClipTypes.DisabledShip => dalekClient.disabledShipAudio.Length,
+            _ => -1
+        };
+
+        if (numberOfAudioClips <= 0)
+        {
+            _mls.LogError($"Audio Clip Type was not listed, cannot play audio clip. Number of audio clips: {numberOfAudioClips}");
+            return;
+        }
+
+        int clipIndex = Random.Range(0, numberOfAudioClips);
+        PlayAudioClipTypeClientRpc(receivedDalekId, audioClipType, clipIndex, interrupt);
+    }
+
     [ClientRpc]
-    public void PlayAudioClipTypeClientRpc(string receivedDalekId, AudioClipTypes audioClipType, int clipIndex, bool interrupt = true)
+    public void PlayAudioClipTypeClientRpc(string receivedDalekId, AudioClipTypes audioClipType, int clipIndex, bool interrupt = false)
     {
         OnPlayAudioClipType?.Invoke(receivedDalekId, audioClipType, clipIndex, interrupt);
     }
@@ -50,7 +88,7 @@ public class DalekNetcodeController : NetworkBehaviour
             Quaternion.identity,
             RoundManager.Instance.spawnedScrapContainer);
 
-        int dalekLazerGunScrapValue = UnityEngine.Random.Range(
+        int dalekLazerGunScrapValue = Random.Range(
             DalekConfig.Instance.DalekLazerGunMinValue.Value,
             DalekConfig.Instance.DalekLazerGunMaxValue.Value);
 

@@ -78,6 +78,7 @@ public class DalekClient : MonoBehaviour
         _heldDalekLazerGun.isBeingUsed = true;
         yield return new WaitForSeconds(0.75f);
         _heldDalekLazerGun.isBeingUsed = false;
+        netcodeController.SetIsShootingServerRpc(_dalekId, false);
     }
 
     private void HandleSpawnDalekLazerGun(string receivedDalekId, NetworkObjectReference dalekLazerGunObjectReference,
@@ -106,7 +107,7 @@ public class DalekClient : MonoBehaviour
         string receivedDalekId, 
         DalekNetcodeController.AudioClipTypes audioClipType, 
         int clipIndex, 
-        bool interrupt = true)
+        bool interrupt = false)
     {
         if (_dalekId != receivedDalekId) return;
 
