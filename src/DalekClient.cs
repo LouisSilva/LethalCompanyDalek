@@ -38,6 +38,8 @@ public class DalekClient : MonoBehaviour
 
     private int _dalekLazerGunScrapValue;
 
+    private Quaternion defaultHeadRotation;
+
     private void OnEnable()
     {
         netcodeController.OnSyncDalekId += HandleSyncDalekId;

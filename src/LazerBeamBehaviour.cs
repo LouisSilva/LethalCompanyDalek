@@ -2,7 +2,6 @@
 using BepInEx.Logging;
 using GameNetcodeStuff;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using Logger = BepInEx.Logging.Logger;
 
 namespace LethalCompanyDalek;

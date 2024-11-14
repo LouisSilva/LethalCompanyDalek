@@ -4,6 +4,7 @@ using GameNetcodeStuff;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.ProBuilder;
+using UnityEngine.Rendering.HighDefinition;
 using Logger = BepInEx.Logging.Logger;
 
 namespace LethalCompanyDalek;
@@ -79,8 +80,6 @@ public class DalekServer : EnemyAI
         SwitchBehaviourStateLocally(States.Searching);
         
         LogDebug("Dalek Spawned!");
-        LightProbeProxyVolume lightProbeProxy = FindObjectOfType<LightProbeProxyVolume>();
-        LogDebug(lightProbeProxy.ToString());
     }
 
     public override void Update()
@@ -106,6 +105,7 @@ public class DalekServer : EnemyAI
 
             case (int)States.Shooting:
             {
+                if (_isShooting) _shootTimer = shootDelay;
                 break;
             }
         }
@@ -173,9 +173,8 @@ public class DalekServer : EnemyAI
                     SwitchBehaviourStateLocally(States.InvestigatingTargetPosition);
                     break;
                 }
-
+                
                 ChangeTargetPlayer(playerControllerB.playerClientId);
-                movingTowardsTargetPlayer = true;
                 
                 // _targetPosition is the last seen position of a player before they went out of view
                 _targetPosition = targetPlayer.transform.position;
@@ -185,30 +184,29 @@ public class DalekServer : EnemyAI
                 AimAtPosition(targetPlayer.transform.position);
                 
                 // Check if the shoot timer is complete
-                if (_shootTimer > 0) break;
+                if (_shootTimer > 0 || _isShooting) break;
         
-                // Check if the dalek is aiming at the player
-                Vector3 directionToPlayer = targetPlayer.transform.position - gun.transform.position;
-                directionToPlayer.Normalize();
-                float dotProduct = Vector3.Dot(gun.transform.up, directionToPlayer);
-                float distanceToPlayer = Vector3.Distance(gun.transform.position, targetPlayer.transform.position);
-        
-                float accuracyThreshold = 0.875f;
-                if (distanceToPlayer < 1f)
-                    accuracyThreshold = 0.7f;
-        
-                if (dotProduct > accuracyThreshold)
+                if (IsGunAimingAtPlayer())
                 {
                     LogDebug("Shooting player");
-                    _isShooting = true;
                     netcodeController.ShootGunClientRpc(_dalekId);
                     _shootTimer = shootDelay;
                 }
                 
                 break;
             }
-            
         }
+    }
+
+    private bool IsGunAimingAtPlayer()
+    {
+        Ray ray = new(gun.transform.position, gun.up);
+        if (Physics.Raycast(ray, out UnityEngine.RaycastHit hit, 100))
+        {
+            return hit.collider.gameObject.tag == "Player";
+        }
+
+        return false;
     }
     
     private void AimAtPosition(Vector3 position)
@@ -288,7 +286,6 @@ public class DalekServer : EnemyAI
                 _agentMaxAcceleration = 2f;
                 _agentMaxAcceleration = 20f;
                 movingTowardsTargetPlayer = false;
-                _targetPosition = default;
                 openDoorSpeedMultiplier = 6;
                 
                 netcodeController.ChangeTargetPlayerClientRpc(_dalekId, 69420);
@@ -335,10 +332,9 @@ public class DalekServer : EnemyAI
 
             case (int)States.Shooting:
             {
-                _agentMaxSpeed = 2f;
-                _agentMaxAcceleration = 25f;
+                _agentMaxSpeed = 0f;
+                _agentMaxAcceleration = 0f;
                 movingTowardsTargetPlayer = true;
-                _targetPosition = default;
                 openDoorSpeedMultiplier = 1f;
                 
                 if (searchForPlayers.inProgress) StopSearch(searchForPlayers);
@@ -399,7 +395,7 @@ public class DalekServer : EnemyAI
 
     private void InitializeConfigValues()
     {
-        
+        if (!IsServer) return;
     }
 
     private void CalculateAgentSpeed()
@@ -411,17 +407,23 @@ public class DalekServer : EnemyAI
             agent.acceleration = _agentMaxAcceleration;
             
         }
-        else if (_isShooting || currentBehaviourStateIndex == (int)States.Shooting && 
-                 Vector3.Distance(transform.position, targetPlayer.transform.position) <= 3 && 
-                 CheckLineOfSightForPlayer(viewWidth, viewRange, proximityAwareness))
+        
+        else if (currentBehaviourStateIndex == (int)States.Shooting)
         {
-            agent.speed = 0;
-            agent.acceleration = _agentMaxAcceleration;
+            if (CheckLineOfSightForPlayer(viewWidth, viewRange, proximityAwareness) || _isShooting)
+            {
+                agent.speed = 0;
+                agent.acceleration = _agentMaxAcceleration;
+            }
+            else
+            {
+                MoveWithAcceleration();
+            }
         }
 
         else if (currentBehaviourStateIndex != (int)States.Dead)
         {
-                MoveWithAcceleration();
+            MoveWithAcceleration();
         }
     }
     
